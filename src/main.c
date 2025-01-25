@@ -6,80 +6,9 @@
 #include <cglm/cglm.h>
 
 // Camera variables
-vec3 cameraPos = { 0.0f, 0.0f, 0.1f };
+vec3 cameraPos = { 0.0f, 0.02f, 0.1f };
 vec3 cameraFront = { 0.0f, 0.0f, -1.0f };
 vec3 cameraUp = { 0.0f, 1.0f, 0.0f };
-float yaw = -90.0f;
-float pitch = 0.0f;
-float lastX = 400, lastY = 300;
-bool firstMouse = true;
-
-// Movement speed
-const float cameraSpeed = 0.001f;
-
-void processInput(GLFWwindow *window) {
-    if (glfwGetKey(window, GLFW_KEY_ESCAPE) == GLFW_PRESS)
-        glfwSetWindowShouldClose(window, true);
-
-    float currentSpeed = cameraSpeed;
-    if (glfwGetKey(window, GLFW_KEY_LEFT_SHIFT) == GLFW_PRESS)
-        currentSpeed *= 2.0f;
-
-    if (glfwGetKey(window, GLFW_KEY_W) == GLFW_PRESS) {
-        vec3 temp;
-        glm_vec3_scale(cameraFront, currentSpeed, temp);
-        glm_vec3_add(cameraPos, temp, cameraPos);
-    }
-    if (glfwGetKey(window, GLFW_KEY_S) == GLFW_PRESS) {
-        vec3 temp;
-        glm_vec3_scale(cameraFront, currentSpeed, temp);
-        glm_vec3_sub(cameraPos, temp, cameraPos);
-    }
-    if (glfwGetKey(window, GLFW_KEY_A) == GLFW_PRESS) {
-        vec3 cross;
-        glm_vec3_cross(cameraFront, cameraUp, cross);
-        glm_normalize(cross);
-        glm_vec3_scale(cross, currentSpeed, cross);
-        glm_vec3_sub(cameraPos, cross, cameraPos);
-    }
-    if (glfwGetKey(window, GLFW_KEY_D) == GLFW_PRESS) {
-        vec3 cross;
-        glm_vec3_cross(cameraFront, cameraUp, cross);
-        glm_normalize(cross);
-        glm_vec3_scale(cross, currentSpeed, cross);
-        glm_vec3_add(cameraPos, cross, cameraPos);
-    }
-}
-
-void mouse_callback(GLFWwindow* window, double xpos, double ypos) {
-    if (firstMouse) {
-        lastX = xpos;
-        lastY = ypos;
-        firstMouse = false;
-    }
-
-    float xoffset = xpos - lastX;
-    float yoffset = lastY - ypos;
-    lastX = xpos;
-    lastY = ypos;
-
-    float sensitivity = 0.1f;
-    xoffset *= sensitivity;
-    yoffset *= sensitivity;
-
-    yaw += xoffset;
-    pitch += yoffset;
-
-    if (pitch > 89.0f) pitch = 89.0f;
-    if (pitch < -89.0f) pitch = -89.0f;
-
-    vec3 front;
-    front[0] = cos(glm_rad(yaw)) * cos(glm_rad(pitch));
-    front[1] = sin(glm_rad(pitch));
-    front[2] = sin(glm_rad(yaw)) * cos(glm_rad(pitch));
-    glm_normalize(front);
-    glm_vec3_copy(front, cameraFront);
-}
 
 int main() {
     if (!glfwInit()) {
@@ -106,10 +35,6 @@ int main() {
 
     // Initialize viewport
     glViewport(0, 0, 800, 600);
-
-    // Mouse and input setup
-    glfwSetCursorPosCallback(window, mouse_callback);
-    glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
 
     // Load and compile shaders
     char* vertexSource = load_shader("shaders/vertex.glsl");
@@ -164,8 +89,6 @@ int main() {
 
     // Main render loop
     while (!glfwWindowShouldClose(window)) {
-        processInput(window);
-
         glClearColor(0.2f, 0.3f, 0.3f, 1.0f);
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
