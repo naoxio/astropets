@@ -54,6 +54,132 @@ float fbm(vec3 p) {
     return value;
 }
 
+
+// Color palette function
+vec3 getBaseColor(int colorType, float variation) {
+    // Base colors with variation
+    switch(colorType) {
+        case 0: // Purple shades
+            return mix(
+                vec3(0.5, 0.0, 0.8),
+                vec3(0.7, 0.2, 1.0),
+                variation
+            );
+        case 1: // Pink shades
+            return mix(
+                vec3(0.9, 0.2, 0.6),
+                vec3(1.0, 0.4, 0.8),
+                variation
+            );
+        case 2: // Blue shades
+            return mix(
+                vec3(0.1, 0.4, 0.9),
+                vec3(0.3, 0.6, 1.0),
+                variation
+            );
+        case 3: // Orange shades
+            return mix(
+                vec3(0.9, 0.4, 0.1),
+                vec3(1.0, 0.6, 0.2),
+                variation
+            );
+        case 4: // Green shades
+            return mix(
+                vec3(0.2, 0.8, 0.2),
+                vec3(0.4, 0.9, 0.4),
+                variation
+            );
+        case 5: // Cyan shades
+            return mix(
+                vec3(0.0, 0.8, 0.8),
+                vec3(0.2, 0.9, 0.9),
+                variation
+            );
+        case 6: // Turquoise shades
+            return mix(
+                vec3(0.0, 0.6, 0.6),
+                vec3(0.2, 0.8, 0.7),
+                variation
+            );
+        case 7: // Yellow shades
+            return mix(
+                vec3(0.9, 0.8, 0.1),
+                vec3(1.0, 0.9, 0.2),
+                variation
+            );
+        case 8: // Brown shades
+            return mix(
+                vec3(0.6, 0.3, 0.1),
+                vec3(0.7, 0.4, 0.2),
+                variation
+            );
+        default: // Default purple
+            return vec3(0.5, 0.0, 0.8);
+    }
+}
+
+vec3 getAccentColor(int colorType, float variation) {
+    // Accent colors that complement the base colors
+    switch(colorType) {
+        case 0: // Purple accents
+            return mix(
+                vec3(0.8, 0.2, 1.0),
+                vec3(1.0, 0.4, 1.0),
+                variation
+            );
+        case 1: // Pink accents
+            return mix(
+                vec3(1.0, 0.3, 0.7),
+                vec3(1.0, 0.5, 0.9),
+                variation
+            );
+        case 2: // Blue accents
+            return mix(
+                vec3(0.2, 0.6, 1.0),
+                vec3(0.4, 0.8, 1.0),
+                variation
+            );
+        case 3: // Orange accents
+            return mix(
+                vec3(1.0, 0.5, 0.0),
+                vec3(1.0, 0.7, 0.2),
+                variation
+            );
+        case 4: // Green accents
+            return mix(
+                vec3(0.3, 1.0, 0.3),
+                vec3(0.5, 1.0, 0.5),
+                variation
+            );
+        case 5: // Cyan accents
+            return mix(
+                vec3(0.0, 1.0, 1.0),
+                vec3(0.3, 1.0, 1.0),
+                variation
+            );
+        case 6: // Turquoise accents
+            return mix(
+                vec3(0.0, 0.8, 0.7),
+                vec3(0.2, 1.0, 0.9),
+                variation
+            );
+        case 7: // Yellow accents
+            return mix(
+                vec3(1.0, 0.9, 0.0),
+                vec3(1.0, 1.0, 0.3),
+                variation
+            );
+        case 8: // Brown accents
+            return mix(
+                vec3(0.8, 0.4, 0.1),
+                vec3(0.9, 0.5, 0.2),
+                variation
+            );
+        default: // Default purple accent
+            return vec3(0.8, 0.2, 1.0);
+    }
+}
+
 void main() {
     if (color != vec3(0.0)) {
         finalColor = vec4(color, 1.0);
@@ -67,7 +193,6 @@ void main() {
     float diff = max(dot(normal, lightDir), 0.0);
     float rim = pow(1.0 - max(dot(normal, viewDir), 0.0), 3.0);
 
-    // Add wobble effect
     vec3 p = fragPosition * 20.0;
     vec3 wobble = vec3(
         sin(iTime * 0.5 + p.x * 2.0),
@@ -76,81 +201,34 @@ void main() {
     ) * 0.02;
     p += wobble;
 
-    if (shaderType == 0) {
-        // Warm bio-mechanical egg
-        float fbmVal = fbm(p * 2.0 + iTime * 0.1);
-        float veins = fbm(p * 5.0 + vec3(0.0, iTime * 0.2, 0.0));
-        float deepLayer = fbm(p * 4.0 - vec3(iTime * 0.2));
-        
-        float pulse1 = 0.5 + 0.5 * sin(iTime * 0.8);
-        float pulse2 = 0.5 + 0.5 * sin(iTime * 1.2 + 1.0);
-        float mainPulse = mix(pulse1, pulse2, 0.5);
-        
-        vec3 baseColor = mix(
-            vec3(0.9, 0.4, 0.2),  // Warmer orange base
-            vec3(1.0, 0.6, 0.3),  // Lighter translucent areas
-            fbmVal
-        );
-        
-        vec3 veinColor = mix(
-            vec3(1.0, 0.2, 0.0),  // Brighter veins
-            vec3(0.8, 0.1, 0.0),  // Darker veins
-            deepLayer
-        ) * (0.8 + 0.2 * mainPulse);
-        
-        float membrane = fbm(p * 5.0 + vec3(iTime * 0.15));
-        float membraneGlow = smoothstep(0.3, 0.7, membrane) * (0.8 + 0.2 * pulse2);
-        
-        float internalGlow = fbm(p * 6.0 - iTime * 0.1) * mainPulse;
-        
-        vec3 outColor = mix(baseColor, veinColor, veins * 0.8);
-        outColor = mix(outColor, vec3(1.0, 0.6, 0.3), membraneGlow * 0.5);
-        outColor += vec3(1.0, 0.4, 0.2) * internalGlow * 0.3;
-        outColor += vec3(0.9, 0.3, 0.1) * rim * 0.6;
-        
-        // Add translucency
-        float translucency = pow(1.0 - abs(dot(normal, viewDir)), 2.0);
-        outColor += vec3(1.0, 0.5, 0.2) * translucency * 0.4;
-        
-        outColor *= (0.5 + 0.5 * diff);
-        
-        float overallPulse = 0.95 + 0.05 * sin(iTime * 0.3);
-        finalColor = vec4(outColor, overallPulse);
-        
-    } else {
-        // Cool bio-mechanical egg
-        float spiral = fbm(p * 3.0 + vec3(sin(iTime * 0.3)));
-        float deepPattern = fbm(p * 4.0 - iTime * 0.2);
-        
-        float pulse1 = 0.5 + 0.5 * sin(iTime * 0.7);
-        float pulse2 = 0.5 + 0.5 * sin(iTime * 1.1);
-        
-        vec3 baseColor = mix(
-            vec3(0.1, 0.4, 0.5),  // Deeper blue
-            vec3(0.3, 0.7, 0.9),  // Brighter blue
-            deepPattern
-        );
-        
-        // Enhanced cellular pattern
-        float cellular = fbm(p * 8.0 + vec3(iTime * 0.1));
-        float cellPattern = smoothstep(0.3, 0.7, cellular);
-        
-        // Energy patterns
-        float energyLines = fbm(p * 7.0 + vec3(sin(iTime * 0.4)));
-        vec3 energyColor = vec3(0.2, 0.9, 0.8) * (0.7 + 0.3 * pulse1);
-        
-        float bioLum = fbm(p * 5.0 + vec3(0.0, iTime * 0.2, 0.0));
-        vec3 glowColor = vec3(0.1, 0.8, 0.7) * (0.6 + 0.4 * pulse1);
-        
-        vec3 outColor = mix(baseColor, energyColor, cellPattern * 0.6);
-        outColor = mix(outColor, glowColor, bioLum * 0.7);
-        outColor += vec3(0.3, 0.9, 1.0) * energyLines * 0.4;
-        outColor += vec3(0.2, 0.8, 1.0) * rim * 0.5;
-        
-        outColor *= (0.6 + 0.4 * diff);
-        outColor *= 0.8 + 0.2 * pulse1;
-        
-        float overallPulse = 0.95 + 0.05 * sin(iTime * 0.3);
-        finalColor = vec4(outColor, overallPulse);
-    }
+    // Get variation based on noise
+    float variation = fbm(p * 2.0 + iTime * 0.1);
+    
+    // Get base and accent colors
+    vec3 baseColor = getBaseColor(shaderType, variation);
+    vec3 accentColor = getAccentColor(shaderType, variation);
+
+    float spiral = fbm(p * 3.0 + vec3(sin(iTime * 0.3)));
+    float deepPattern = fbm(p * 4.0 - iTime * 0.2);
+    float pulse1 = 0.5 + 0.5 * sin(iTime * 0.7);
+    float pulse2 = 0.5 + 0.5 * sin(iTime * 1.1);
+
+    // Enhanced cellular pattern
+    float cellular = fbm(p * 8.0 + vec3(iTime * 0.1));
+    float cellPattern = smoothstep(0.3, 0.7, cellular);
+
+    // Energy patterns
+    float energyLines = fbm(p * 7.0 + vec3(sin(iTime * 0.4)));
+    float bioLum = fbm(p * 5.0 + vec3(0.0, iTime * 0.2, 0.0));
+
+    vec3 outColor = mix(baseColor, accentColor, cellPattern * 0.6);
+    outColor = mix(outColor, accentColor * 1.2, bioLum * 0.4);
+    outColor += accentColor * energyLines * 0.3;
+    outColor += accentColor * rim * 0.5;
+
+    outColor *= (0.6 + 0.4 * diff);
+    outColor *= 0.8 + 0.2 * pulse1;
+
+    float overallPulse = 0.95 + 0.05 * sin(iTime * 0.3);
+    finalColor = vec4(outColor, overallPulse);
 }

@@ -6,11 +6,14 @@
 // Physics constants
 #define GRAVITY 9.81f
 #define GROUND_Y 0.0f
+#define NUM_COLORS 9  
 
 typedef struct {
     Vector3 position;
     Vector3 velocity;
     bool isGrounded;
+    int colorType;    // Now ranges from 0 to NUM_COLORS-1
+    bool active;
 } PhysicsObject;
 
 int main(void) {
@@ -32,19 +35,8 @@ int main(void) {
         eggModel.materials[i].shader = shader;
     }
 
-    // Initialize physics objects for eggs
-    PhysicsObject eggs[2] = {
-        { // First egg
-            .position = (Vector3){ 0.3f, 0.5f, 0.0f }, // Starting higher to see fall
-            .velocity = (Vector3){ 0.0f, 0.0f, 0.0f },
-            .isGrounded = false
-        },
-        { // Second egg
-            .position = (Vector3){ -0.3f, 0.5f, 0.0f }, // Starting higher to see fall
-            .velocity = (Vector3){ 0.0f, 0.0f, 0.0f },
-            .isGrounded = false
-        }
-    };
+    // Initialize single egg
+    PhysicsObject egg = { 0 };
 
     // Camera setup
     Camera3D camera = {
@@ -75,24 +67,35 @@ int main(void) {
 
     DisableCursor();
 
+
     while (!WindowShouldClose()) {
         float deltaTime = GetFrameTime();
 
-        // Update physics
-        for (int i = 0; i < 2; i++) {
-            if (!eggs[i].isGrounded) {
-                // Apply gravity
-                eggs[i].velocity.y -= GRAVITY * deltaTime;
-                
-                // Update position
-                eggs[i].position.y += eggs[i].velocity.y * deltaTime;
+        // Spawn new egg on spacebar
+        if (IsKeyPressed(KEY_SPACE)) {
+            egg = (PhysicsObject){
+                .position = (Vector3){ 0.0f, 0.5f, 0.0f },
+                .velocity = (Vector3){ 0.0f, 0.0f, 0.0f },
+                .isGrounded = false,
+                .colorType = GetRandomValue(0, NUM_COLORS-1),  // Random color from available types
+                .active = true
+            };
+        }
 
-                // Check ground collision
-                if (eggs[i].position.y <= GROUND_Y) {
-                    eggs[i].position.y = GROUND_Y;
-                    eggs[i].velocity.y = 0;
-                    eggs[i].isGrounded = true;
-                }
+
+        // Update physics
+        if (egg.active && !egg.isGrounded) {
+            // Apply gravity
+            egg.velocity.y -= GRAVITY * deltaTime;
+            
+            // Update position
+            egg.position.y += egg.velocity.y * deltaTime;
+
+            // Check ground collision
+            if (egg.position.y <= GROUND_Y) {
+                egg.position.y = GROUND_Y;
+                egg.velocity.y = 0;
+                egg.isGrounded = true;
             }
         }
 
@@ -130,15 +133,14 @@ int main(void) {
             // Draw ground
             DrawPlane((Vector3){0, GROUND_Y, 0}, (Vector2){20, 20}, BROWN);
 
-            // Setup matrices and draw eggs
-            Vector3 noColor = {0, 0, 0};
-            SetShaderValue(shader, colorLoc, (float*)&noColor, SHADER_UNIFORM_VEC3);
-
-            for (int i = 0; i < 2; i++) {
-                SetShaderValue(shader, shaderTypeLoc, (int[]){i}, SHADER_UNIFORM_INT);
+            // Draw egg if active
+            if (egg.active) {
+                Vector3 noColor = {0, 0, 0};
+                SetShaderValue(shader, colorLoc, (float*)&noColor, SHADER_UNIFORM_VEC3);
+                SetShaderValue(shader, shaderTypeLoc, (int[]){egg.colorType}, SHADER_UNIFORM_INT);
                 
                 Matrix model = MatrixMultiply(
-                    MatrixTranslate(eggs[i].position.x, eggs[i].position.y, eggs[i].position.z),
+                    MatrixTranslate(egg.position.x, egg.position.y, egg.position.z),
                     MatrixScale(modelScale, modelScale, modelScale)
                 );
                 
@@ -156,22 +158,13 @@ int main(void) {
                 SetShaderValueMatrix(shader, mvpLoc, mvp);
                 SetShaderValueMatrix(shader, normalMatrixLoc, normalMatrix);
                 
-                DrawModel(eggModel, eggs[i].position, 1.0f, WHITE);
+                DrawModel(eggModel, egg.position, 1.0f, WHITE);
             }
 
             EndMode3D();
             
             DrawText("Hold left mouse button and drag to rotate camera", 10, 10, 20, WHITE);
-            DrawText("Press R to reset eggs", 10, 40, 20, WHITE);
-
-            // Reset eggs when R is pressed
-            if (IsKeyPressed(KEY_R)) {
-                for (int i = 0; i < 2; i++) {
-                    eggs[i].position.y = 0.5f;
-                    eggs[i].velocity = (Vector3){ 0.0f, 0.0f, 0.0f };
-                    eggs[i].isGrounded = false;
-                }
-            }
+            DrawText("Press SPACE to spawn egg", 10, 40, 20, WHITE);
             
         EndDrawing();
     }
