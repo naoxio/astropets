@@ -1,2 +1,3 @@
 *.o
-alien_egg
+bin/
+build/

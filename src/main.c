@@ -2,45 +2,31 @@
 #include <raymath.h>
 #include <stdio.h>
 #include <math.h>
-
-// Physics constants
-#define GRAVITY 9.81f
-#define GROUND_Y 0.0f
-#define NUM_COLORS 9  
-
-typedef struct {
-    Vector3 position;
-    Vector3 velocity;
-    bool isGrounded;
-    int colorType;    // Now ranges from 0 to NUM_COLORS-1
-    bool active;
-} PhysicsObject;
+#include <stdlib.h>
+#include "hay.h"
+#include "egg.h" 
+#include "constants.h"
+#include "terrarium.h"
 
 int main(void) {
     const int screenWidth = 800;
     const int screenHeight = 600;
-    InitWindow(screenWidth, screenHeight, "Alien Egg");
+
+    InitWindow(screenWidth, screenHeight, "Space Terrarium");
     SetTargetFPS(60);
 
     // Load shaders
-    Shader shader = LoadShader("shaders/vertex.glsl", "shaders/fragment.glsl"); 
+    Shader eggShader = LoadShader("shaders/egg_vertex.glsl", "shaders/egg_fragment.glsl");
+    Shader glassShader = LoadShader("shaders/glass_vertex.glsl", "shaders/glass_fragment.glsl");
 
-    // Model setup
-    float modelScale = 5.0f;
-    Model eggModel = LoadModel("assets/egg.glb");
-    eggModel.transform = MatrixScale(modelScale, modelScale, modelScale);
-    
-    // Assign shader to all materials
-    for(int i = 0; i < eggModel.materialCount; i++) {
-        eggModel.materials[i].shader = shader;
-    }
-
-    // Initialize single egg
-    PhysicsObject egg = { 0 };
+    // Initialize systems
+    HayPiece* hayPieces = InitializeNest();
+    EggSystem eggSystem = InitializeEggSystem(eggShader);
+    TerrariumSystem terrarium = InitializeTerrariumSystem(glassShader);
 
     // Camera setup
     Camera3D camera = {
-        .position = (Vector3){ 0.0f, 0.05f, 0.15f },
+        .position = (Vector3){ 0.0f, 2.0f, 4.0f },
         .target = (Vector3){ 0.0f, 0.0f, 0.0f },
         .up = (Vector3){ 0.0f, 1.0f, 0.0f },
         .fovy = 40.0f,
@@ -48,56 +34,33 @@ int main(void) {
     };
 
     // Orbital camera parameters
-    float cameraDistance = 2.0f;
+    float cameraDistance = 4.0f;
+    const float minDistance = 2.0f;
+    const float maxDistance = 10.0f;
+    const float zoomSpeed = 0.5f;
     float angleHorizontal = 0.0f;
     float angleVertical = 0.3f;
     float rotationSpeed = 2.0f;
 
-    // Get shader locations
-    int resolutionLoc = GetShaderLocation(shader, "iResolution");
-    int timeLoc = GetShaderLocation(shader, "iTime");
-    int cameraPosLoc = GetShaderLocation(shader, "cameraPos");
-    int cameraFrontLoc = GetShaderLocation(shader, "cameraFront");
-    int cameraUpLoc = GetShaderLocation(shader, "cameraUp");
-    int colorLoc = GetShaderLocation(shader, "color");
-    int shaderTypeLoc = GetShaderLocation(shader, "shaderType");
-    int modelLoc = GetShaderLocation(shader, "model");
-    int mvpLoc = GetShaderLocation(shader, "mvp");
-    int normalMatrixLoc = GetShaderLocation(shader, "normalMatrix");
-
     DisableCursor();
-
 
     while (!WindowShouldClose()) {
         float deltaTime = GetFrameTime();
 
+        // Handle zoom with mouse wheel
+        float wheel = GetMouseWheelMove();
+        if (wheel != 0) {
+            cameraDistance -= wheel * zoomSpeed;
+            cameraDistance = Clamp(cameraDistance, minDistance, maxDistance);
+        }
+
         // Spawn new egg on spacebar
         if (IsKeyPressed(KEY_SPACE)) {
-            egg = (PhysicsObject){
-                .position = (Vector3){ 0.0f, 0.5f, 0.0f },
-                .velocity = (Vector3){ 0.0f, 0.0f, 0.0f },
-                .isGrounded = false,
-                .colorType = GetRandomValue(0, NUM_COLORS-1),  // Random color from available types
-                .active = true
-            };
+            SpawnEgg(&eggSystem);
         }
-
 
         // Update physics
-        if (egg.active && !egg.isGrounded) {
-            // Apply gravity
-            egg.velocity.y -= GRAVITY * deltaTime;
-            
-            // Update position
-            egg.position.y += egg.velocity.y * deltaTime;
-
-            // Check ground collision
-            if (egg.position.y <= GROUND_Y) {
-                egg.position.y = GROUND_Y;
-                egg.velocity.y = 0;
-                egg.isGrounded = true;
-            }
-        }
+        UpdateEggPhysics(&eggSystem, hayPieces, deltaTime);
 
         // Camera movement
         if (IsMouseButtonDown(MOUSE_BUTTON_LEFT)) {
@@ -111,7 +74,6 @@ int main(void) {
         float x = cameraDistance * cosf(angleVertical) * sinf(angleHorizontal);
         float y = cameraDistance * sinf(angleVertical);
         float z = cameraDistance * cosf(angleVertical) * cosf(angleHorizontal);
-
         camera.position = (Vector3){ x, y + 0.05f, z };
         camera.target = (Vector3){ 0.0f, 0.0f, 0.0f };
 
@@ -119,58 +81,29 @@ int main(void) {
             ClearBackground(DARKGRAY);
             BeginMode3D(camera);
 
-            // Update basic uniforms
-            float screenWidth = (float)GetScreenWidth();
-            float screenHeight = (float)GetScreenHeight();
-            SetShaderValue(shader, resolutionLoc, (float[2]){screenWidth, screenHeight}, SHADER_UNIFORM_VEC2);
-            SetShaderValue(shader, timeLoc, (float[]){GetTime()}, SHADER_UNIFORM_FLOAT);
-            SetShaderValue(shader, cameraPosLoc, (float*)&camera.position, SHADER_UNIFORM_VEC3);
-            
-            Vector3 cameraFront = Vector3Normalize(Vector3Subtract(camera.target, camera.position));
-            SetShaderValue(shader, cameraFrontLoc, (float*)&cameraFront, SHADER_UNIFORM_VEC3);
-            SetShaderValue(shader, cameraUpLoc, (float*)&camera.up, SHADER_UNIFORM_VEC3);
-
-            // Draw ground
-            DrawPlane((Vector3){0, GROUND_Y, 0}, (Vector2){20, 20}, BROWN);
-
-            // Draw egg if active
-            if (egg.active) {
-                Vector3 noColor = {0, 0, 0};
-                SetShaderValue(shader, colorLoc, (float*)&noColor, SHADER_UNIFORM_VEC3);
-                SetShaderValue(shader, shaderTypeLoc, (int[]){egg.colorType}, SHADER_UNIFORM_INT);
-                
-                Matrix model = MatrixMultiply(
-                    MatrixTranslate(egg.position.x, egg.position.y, egg.position.z),
-                    MatrixScale(modelScale, modelScale, modelScale)
-                );
-                
-                Matrix view = GetCameraMatrix(camera);
-                Matrix projection = MatrixPerspective(
-                    camera.fovy * DEG2RAD,
-                    (float)screenWidth/(float)screenHeight,
-                    0.01f, 1000.0f
-                );
-                
-                Matrix mvp = MatrixMultiply(MatrixMultiply(model, view), projection);
-                Matrix normalMatrix = MatrixTranspose(MatrixInvert(model));
-                
-                SetShaderValueMatrix(shader, modelLoc, model);
-                SetShaderValueMatrix(shader, mvpLoc, mvp);
-                SetShaderValueMatrix(shader, normalMatrixLoc, normalMatrix);
-                
-                DrawModel(eggModel, egg.position, 1.0f, WHITE);
+            // Draw contents first (hay and eggs)
+            for (int i = 0; i < NUM_HAY_PIECES + TOP_LAYER_PIECES; i++) {
+                if (Vector3Distance(hayPieces[i].startPos, terrarium.glass.position) < terrarium.glass.radius) {
+                    DrawHayPiece(hayPieces[i]);
+                }
             }
 
+            DrawEgg(&eggSystem, camera, eggShader);
+            DrawTerrariumSystem(&terrarium, camera);
+
             EndMode3D();
-            
             DrawText("Hold left mouse button and drag to rotate camera", 10, 10, 20, WHITE);
-            DrawText("Press SPACE to spawn egg", 10, 40, 20, WHITE);
-            
+            DrawText("Use mouse wheel to zoom in/out", 10, 30, 20, WHITE);
+            DrawText("Press SPACE to spawn egg", 10, 50, 20, WHITE);
         EndDrawing();
     }
 
-    UnloadModel(eggModel);
-    UnloadShader(shader);
+    // Cleanup
+    free(hayPieces);
+    UnloadEggSystem(&eggSystem);
+    UnloadShader(eggShader);
+    UnloadShader(glassShader);
+    UnloadTerrariumSystem(&terrarium);
     CloseWindow();
 
     return 0;
