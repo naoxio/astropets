@@ -1,6 +1,14 @@
-#version 330 core
-out vec4 FragColor;
+#version 330
 
+// Inputs from vertex shader
+in vec3 fragPosition;
+in vec3 fragNormal;
+in vec2 fragTexCoord;
+
+// Output
+out vec4 finalColor;
+
+// Uniforms
 uniform vec2 iResolution;
 uniform float iTime;
 uniform vec3 cameraPos;
@@ -9,26 +17,38 @@ uniform vec3 cameraUp;
 uniform vec3 color;
 uniform int shaderType;
 
-float hash(float n) { return fract(sin(n) * 753.5453123); }
+// Enhanced noise functions
+float hash(float n) { 
+    return fract(sin(n) * 753.5453123); 
+}
 
 float noise(vec3 p) {
     vec3 fp = floor(p);
     vec3 fr = fract(p);
     fr = fr * fr * (3.0 - 2.0 * fr);
     float n = fp.x + fp.y * 157.0 + 113.0 * fp.z;
-    return mix(mix(
-        mix(hash(n + 0.0), hash(n + 1.0), fr.x),
-        mix(hash(n + 157.0), hash(n + 158.0), fr.x), fr.y),
-        mix(mix(hash(n + 113.0), hash(n + 114.0), fr.x),
-        mix(hash(n + 270.0), hash(n + 271.0), fr.x), fr.y), fr.z);
+    return mix(
+        mix(
+            mix(hash(n + 0.0), hash(n + 1.0), fr.x),
+            mix(hash(n + 157.0), hash(n + 158.0), fr.x),
+            fr.y
+        ),
+        mix(
+            mix(hash(n + 113.0), hash(n + 114.0), fr.x),
+            mix(hash(n + 270.0), hash(n + 271.0), fr.x),
+            fr.y
+        ),
+        fr.z
+    );
 }
 
 float fbm(vec3 p) {
     float value = 0.0;
-    float amplitude = 0.5;
-    for (int i = 0; i < 3; i++) { // Reduced from 5 to 3
-        value += amplitude * noise(p);
-        p *= 2.0;
+    float amplitude = 1.0;
+    float frequency = 1.0;
+    for (int i = 0; i < 4; i++) {
+        value += amplitude * noise(p * frequency);
+        frequency *= 2.0;
         amplitude *= 0.5;
     }
     return value;
@@ -36,88 +56,101 @@ float fbm(vec3 p) {
 
 void main() {
     if (color != vec3(0.0)) {
-        FragColor = vec4(color, 1.0);
+        finalColor = vec4(color, 1.0);
         return;
     }
 
-    vec2 uv = (2.0 * gl_FragCoord.xy - iResolution.xy) / iResolution.y;
-    vec3 ro = cameraPos;
-    vec3 rd = normalize(vec3(uv, 1.0));
-    vec3 cameraRight = normalize(cross(cameraFront, cameraUp));
-    vec3 cameraUpAdjusted = normalize(cross(cameraRight, cameraFront));
-    rd = normalize(rd.x * cameraRight + rd.y * cameraUpAdjusted + rd.z * cameraFront);
+    vec3 viewDir = normalize(cameraPos - fragPosition);
+    vec3 normal = normalize(fragNormal);
+    vec3 lightDir = normalize(vec3(1.0, 1.0, -1.0));
 
-    float a = 0.8;
-    float b = 1.5;
-    mediump float t = 0.0;
-    float minStep = 0.001;
-    float maxStep = 10.0;
-    float threshold = 0.001;
-    
-    for(int i = 0; i < 100; i++) { // Reduced from 200 to 100
-        vec3 p = ro + rd * t;
-        float x = p.x / a;
-        float y = (p.y + 0.2) / b;
-        float z = p.z / a;
-        
-        float deform = shaderType == 0 ? 0.1 * fbm(p * 5.0 + iTime * 0.1) : 0.15 * fbm(p * 3.0 + iTime * 0.1);
-        float d = length(vec3(x, y, z)) - (1.0 + deform);
-        
-        if(abs(d) < threshold || t > maxStep) break; // Early exit
-        t += d * 0.5; // Fixed step size
-    }
-    
-    vec3 p = ro + rd * t;
-    vec3 n = normalize(p);
-    vec3 l = normalize(vec3(1.0, 1.0, -1.0));
-    float diff = max(dot(n, l), 0.0);
+    float diff = max(dot(normal, lightDir), 0.0);
+    float rim = pow(1.0 - max(dot(normal, viewDir), 0.0), 3.0);
 
-    float pulse = 0.5 + 0.5 * sin(iTime * 0.5);
-    
+    // Add wobble effect
+    vec3 p = fragPosition * 20.0;
+    vec3 wobble = vec3(
+        sin(iTime * 0.5 + p.x * 2.0),
+        cos(iTime * 0.4 + p.y * 2.0),
+        sin(iTime * 0.6 + p.z * 2.0)
+    ) * 0.02;
+    p += wobble;
+
     if (shaderType == 0) {
-        float fbmVal = fbm(p * 3.0); // Cached fbm value
-        float veins = fbm(p * 15.0 + vec3(0.0, iTime * 0.1, 0.0));
-        float veinsPattern = smoothstep(0.4, 0.6, veins);
+        // Warm bio-mechanical egg
+        float fbmVal = fbm(p * 2.0 + iTime * 0.1);
+        float veins = fbm(p * 5.0 + vec3(0.0, iTime * 0.2, 0.0));
+        float deepLayer = fbm(p * 4.0 - vec3(iTime * 0.2));
+        
+        float pulse1 = 0.5 + 0.5 * sin(iTime * 0.8);
+        float pulse2 = 0.5 + 0.5 * sin(iTime * 1.2 + 1.0);
+        float mainPulse = mix(pulse1, pulse2, 0.5);
         
         vec3 baseColor = mix(
-            vec3(0.8, 0.2, 0.0),
-            vec3(1.0, 0.5, 0.0),
+            vec3(0.9, 0.4, 0.2),  // Warmer orange base
+            vec3(1.0, 0.6, 0.3),  // Lighter translucent areas
             fbmVal
         );
         
-        vec3 veinColor = vec3(1.0, 0.3, 0.0) * (0.8 + 0.2 * pulse);
+        vec3 veinColor = mix(
+            vec3(1.0, 0.2, 0.0),  // Brighter veins
+            vec3(0.8, 0.1, 0.0),  // Darker veins
+            deepLayer
+        ) * (0.8 + 0.2 * mainPulse);
         
-        float spots = fbm(p * 20.0);
-        float spotsPattern = smoothstep(0.5, 0.7, spots);
-        vec3 spotColor = vec3(1.0, 0.8, 0.0);
+        float membrane = fbm(p * 5.0 + vec3(iTime * 0.15));
+        float membraneGlow = smoothstep(0.3, 0.7, membrane) * (0.8 + 0.2 * pulse2);
         
-        vec3 finalColor = mix(baseColor, veinColor, veinsPattern);
-        finalColor = mix(finalColor, spotColor, spotsPattern * 0.5);
+        float internalGlow = fbm(p * 6.0 - iTime * 0.1) * mainPulse;
         
-        float glow = (1.0 - abs(dot(n, rd))) * (1.0 - abs(dot(n, rd))); // Cheaper than pow
-        finalColor += vec3(1.0, 0.5, 0.0) * glow * 0.3;
+        vec3 outColor = mix(baseColor, veinColor, veins * 0.8);
+        outColor = mix(outColor, vec3(1.0, 0.6, 0.3), membraneGlow * 0.5);
+        outColor += vec3(1.0, 0.4, 0.2) * internalGlow * 0.3;
+        outColor += vec3(0.9, 0.3, 0.1) * rim * 0.6;
         
-        FragColor = vec4(finalColor, 1.0);
+        // Add translucency
+        float translucency = pow(1.0 - abs(dot(normal, viewDir)), 2.0);
+        outColor += vec3(1.0, 0.5, 0.2) * translucency * 0.4;
+        
+        outColor *= (0.5 + 0.5 * diff);
+        
+        float overallPulse = 0.95 + 0.05 * sin(iTime * 0.3);
+        finalColor = vec4(outColor, overallPulse);
+        
     } else {
-        float spiral = fbm(p * 10.0 + vec3(sin(iTime * 0.2) * 0.5));
-        float spiralPattern = smoothstep(0.3, 0.7, spiral);
+        // Cool bio-mechanical egg
+        float spiral = fbm(p * 3.0 + vec3(sin(iTime * 0.3)));
+        float deepPattern = fbm(p * 4.0 - iTime * 0.2);
+        
+        float pulse1 = 0.5 + 0.5 * sin(iTime * 0.7);
+        float pulse2 = 0.5 + 0.5 * sin(iTime * 1.1);
         
         vec3 baseColor = mix(
-            vec3(0.2, 0.0, 0.4),
-            vec3(0.4, 0.0, 0.8),
-            fbm(p * 4.0)
+            vec3(0.1, 0.4, 0.5),  // Deeper blue
+            vec3(0.3, 0.7, 0.9),  // Brighter blue
+            deepPattern
         );
         
-        float bioLum = fbm(p * 25.0 + vec3(0.0, iTime * 0.15, 0.0));
-        float bioPattern = smoothstep(0.6, 0.8, bioLum);
-        vec3 glowColor = vec3(0.0, 0.8, 1.0) * (0.8 + 0.2 * pulse);
+        // Enhanced cellular pattern
+        float cellular = fbm(p * 8.0 + vec3(iTime * 0.1));
+        float cellPattern = smoothstep(0.3, 0.7, cellular);
         
-        vec3 finalColor = mix(baseColor, glowColor, bioPattern);
-        finalColor = mix(finalColor, vec3(0.6, 0.2, 1.0), spiralPattern * 0.4);
+        // Energy patterns
+        float energyLines = fbm(p * 7.0 + vec3(sin(iTime * 0.4)));
+        vec3 energyColor = vec3(0.2, 0.9, 0.8) * (0.7 + 0.3 * pulse1);
         
-        float glow = (1.0 - abs(dot(n, rd))) * (1.0 - abs(dot(n, rd))); // Cheaper than pow
-        finalColor += vec3(0.2, 0.4, 1.0) * glow * 0.2;
+        float bioLum = fbm(p * 5.0 + vec3(0.0, iTime * 0.2, 0.0));
+        vec3 glowColor = vec3(0.1, 0.8, 0.7) * (0.6 + 0.4 * pulse1);
         
-        FragColor = vec4(finalColor, 1.0);
+        vec3 outColor = mix(baseColor, energyColor, cellPattern * 0.6);
+        outColor = mix(outColor, glowColor, bioLum * 0.7);
+        outColor += vec3(0.3, 0.9, 1.0) * energyLines * 0.4;
+        outColor += vec3(0.2, 0.8, 1.0) * rim * 0.5;
+        
+        outColor *= (0.6 + 0.4 * diff);
+        outColor *= 0.8 + 0.2 * pulse1;
+        
+        float overallPulse = 0.95 + 0.05 * sin(iTime * 0.3);
+        finalColor = vec4(outColor, overallPulse);
     }
 }

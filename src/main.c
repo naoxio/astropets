@@ -1,163 +1,165 @@
+#include <raylib.h>
+#include <raymath.h>
 #include <stdio.h>
-#include <GL/glew.h>
-#include <GLFW/glfw3.h>
-#include "shader_loader.h"
-#include "model_loader.h"
-#include <cglm/cglm.h>
+#include <math.h>
 
-// Camera variables
-vec3 cameraPos = { 0.0f, 0.02f, 0.1f };
-vec3 cameraFront = { 0.0f, 0.0f, -1.0f };
-vec3 cameraUp = { 0.0f, 1.0f, 0.0f };
+int main(void) {
+    const int screenWidth = 800;
+    const int screenHeight = 600;
+    InitWindow(screenWidth, screenHeight, "Alien Egg");
+    SetTargetFPS(60);
 
-int main() {
-    if (!glfwInit()) {
-        printf("Failed to initialize GLFW\n");
-        return -1;
-    }
+    // Load shaders
+    Shader shader = LoadShader("shaders/vertex.glsl", "shaders/fragment.glsl"); 
 
-    glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 3);
-    glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 3);
-    glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
-
-    GLFWwindow* window = glfwCreateWindow(800, 600, "Alien Egg", NULL, NULL);
-    if (!window) {
-        printf("Failed to create GLFW window\n");
-        glfwTerminate();
-        return -1;
-    }
-    glfwMakeContextCurrent(window);
-
-    if (glewInit() != GLEW_OK) {
-        printf("Failed to initialize GLEW\n");
-        return -1;
-    }
-
-    // Initialize viewport
-    glViewport(0, 0, 800, 600);
-
-    // Load and compile shaders
-    char* vertexSource = load_shader("shaders/vertex.glsl");
-    char* fragmentSource = load_shader("shaders/fragment.glsl");
-    if (!vertexSource || !fragmentSource) {
-        printf("Failed to load shaders\n");
-        return -1;
-    }
-
-    GLuint shaderProgram = create_shader_program(vertexSource, fragmentSource);
-    if (!shaderProgram) {
-        printf("Failed to create shader program\n");
-        return -1;
-    }
-
-    // Enable depth testing
-    glEnable(GL_DEPTH_TEST);
-
-    // Load model
+    // Model setup
     float modelScale = 1.0f;
-    Model eggModel = load_model("assets/egg.glb", modelScale);
-    if (eggModel.vao == 0) {
-        printf("Failed to load model\n");
-        return -1;
+    Model eggModel = LoadModel("assets/egg.glb");
+    eggModel.transform = MatrixScale(modelScale, modelScale, modelScale);
+    
+    // Assign shader to all materials
+    for(int i = 0; i < eggModel.materialCount; i++) {
+        eggModel.materials[i].shader = shader;
     }
 
-    // Create and setup ground plane
-    float groundVertices[] = {
-        -10.0f, -2.0f, -10.0f,
-         10.0f, -2.0f, -10.0f,
-         10.0f, -2.0f,  10.0f,
-        -10.0f, -2.0f,  10.0f
-    };
-    unsigned int groundIndices[] = {
-        0, 1, 2,
-        2, 3, 0
+    // Camera setup
+    Camera3D camera = {
+        .position = (Vector3){ 0.0f, 0.05f, 0.15f },
+        .target = (Vector3){ 0.0f, 0.0f, 0.0f },
+        .up = (Vector3){ 0.0f, 1.0f, 0.0f },
+        .fovy = 40.0f,
+        .projection = CAMERA_PERSPECTIVE
     };
 
-    GLuint groundVAO, groundVBO, groundEBO;
-    glGenVertexArrays(1, &groundVAO);
-    glGenBuffers(1, &groundVBO);
-    glGenBuffers(1, &groundEBO);
+    // Orbital camera parameters
+    float cameraDistance = 0.15f;
+    float angleHorizontal = 0.0f;
+    float angleVertical = 0.3f;
+    float rotationSpeed = 2.0f;
 
-    glBindVertexArray(groundVAO);
-    glBindBuffer(GL_ARRAY_BUFFER, groundVBO);
-    glBufferData(GL_ARRAY_BUFFER, sizeof(groundVertices), groundVertices, GL_STATIC_DRAW);
-    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, groundEBO);
-    glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(groundIndices), groundIndices, GL_STATIC_DRAW);
-    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(float), (void*)0);
-    glEnableVertexAttribArray(0);
-    glBindVertexArray(0);
+    // Get shader locations
+    int resolutionLoc = GetShaderLocation(shader, "iResolution");
+    int timeLoc = GetShaderLocation(shader, "iTime");
+    int cameraPosLoc = GetShaderLocation(shader, "cameraPos");
+    int cameraFrontLoc = GetShaderLocation(shader, "cameraFront");
+    int cameraUpLoc = GetShaderLocation(shader, "cameraUp");
+    int colorLoc = GetShaderLocation(shader, "color");
+    int shaderTypeLoc = GetShaderLocation(shader, "shaderType");
+    
+    // New shader locations
+    int modelLoc = GetShaderLocation(shader, "model");
+    int mvpLoc = GetShaderLocation(shader, "mvp");
+    int normalMatrixLoc = GetShaderLocation(shader, "normalMatrix");
 
-    // Main render loop
-    while (!glfwWindowShouldClose(window)) {
-        glClearColor(0.2f, 0.3f, 0.3f, 1.0f);
-        glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+    DisableCursor();
 
-        glUseProgram(shaderProgram);
+    while (!WindowShouldClose()) {
+        // Camera movement
+        if (IsMouseButtonDown(MOUSE_BUTTON_LEFT)) {
+            Vector2 mouseDelta = GetMouseDelta();
+            angleHorizontal -= mouseDelta.x * rotationSpeed * GetFrameTime();
+            angleVertical -= mouseDelta.y * rotationSpeed * GetFrameTime();
+            angleVertical = Clamp(angleVertical, -1.5f, 1.5f);
+        }
 
-        // Set common uniforms
-        int width, height;
-        glfwGetFramebufferSize(window, &width, &height);
-        glUniform2f(glGetUniformLocation(shaderProgram, "iResolution"), (float)width, (float)height);
-        glUniform1f(glGetUniformLocation(shaderProgram, "iTime"), (float)glfwGetTime());
-        glUniform3fv(glGetUniformLocation(shaderProgram, "cameraPos"), 1, cameraPos);
-        glUniform3fv(glGetUniformLocation(shaderProgram, "cameraFront"), 1, cameraFront);
-        glUniform3fv(glGetUniformLocation(shaderProgram, "cameraUp"), 1, cameraUp);
+        // Update camera position
+        float x = cameraDistance * cosf(angleVertical) * sinf(angleHorizontal);
+        float y = cameraDistance * sinf(angleVertical);
+        float z = cameraDistance * cosf(angleVertical) * cosf(angleHorizontal);
 
-        // Create view and projection matrices
-        mat4 projection;
-        glm_perspective(glm_rad(45.0f), 800.0f / 600.0f, 0.1f, 100.0f, projection);
+        camera.position = (Vector3){ x, y + 0.05f, z };
+        camera.target = (Vector3){ 0.0f, 0.0f, 0.0f };
 
-        mat4 view;
-        vec3 center;
-        glm_vec3_add(cameraPos, cameraFront, center);
-        glm_lookat(cameraPos, center, cameraUp, view);
+        BeginDrawing();
+            ClearBackground(DARKGRAY);
+            BeginMode3D(camera);
 
-        // Set matrix uniforms
-        glUniformMatrix4fv(glGetUniformLocation(shaderProgram, "projection"), 1, GL_FALSE, (float*)projection);
-        glUniformMatrix4fv(glGetUniformLocation(shaderProgram, "view"), 1, GL_FALSE, (float*)view);
+            // Update basic uniforms
+            float screenWidth = (float)GetScreenWidth();
+            float screenHeight = (float)GetScreenHeight();
+            SetShaderValue(shader, resolutionLoc, (float[2]){screenWidth, screenHeight}, SHADER_UNIFORM_VEC2);
+            SetShaderValue(shader, timeLoc, (float[]){GetTime()}, SHADER_UNIFORM_FLOAT);
+            SetShaderValue(shader, cameraPosLoc, (float*)&camera.position, SHADER_UNIFORM_VEC3);
+            
+            Vector3 cameraFront = Vector3Normalize(Vector3Subtract(camera.target, camera.position));
+            SetShaderValue(shader, cameraFrontLoc, (float*)&cameraFront, SHADER_UNIFORM_VEC3);
+            SetShaderValue(shader, cameraUpLoc, (float*)&camera.up, SHADER_UNIFORM_VEC3);
 
-        // Draw ground
-        mat4 groundModel;
-        glm_mat4_identity(groundModel);
-        glUniformMatrix4fv(glGetUniformLocation(shaderProgram, "model"), 1, GL_FALSE, (float*)groundModel);
-        vec3 groundColor = {0.45f, 0.29f, 0.14f};
-        glUniform3fv(glGetUniformLocation(shaderProgram, "color"), 1, groundColor);
-        glBindVertexArray(groundVAO);
-        glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, 0);
+            // Draw ground
+            DrawPlane((Vector3){0, -2, 0}, (Vector2){20, 20}, BROWN);
 
-        // Draw first egg (Shader Type 0)
-        glUniform1i(glGetUniformLocation(shaderProgram, "shaderType"), 0);
-        mat4 modelMatrix1;
-        glm_mat4_identity(modelMatrix1);
-        glm_translate(modelMatrix1, (vec3){0.02f, -0.01f, 0.f}); // Position first egg
-        glm_scale(modelMatrix1, (vec3){modelScale, modelScale, modelScale});
-        glUniformMatrix4fv(glGetUniformLocation(shaderProgram, "model"), 1, GL_FALSE, (float*)modelMatrix1);
-        vec3 noColor = {0.0f, 0.0f, 0.0f};
-        glUniform3fv(glGetUniformLocation(shaderProgram, "color"), 1, noColor);
-        glBindVertexArray(eggModel.vao);
-        glDrawElements(GL_TRIANGLES, eggModel.indexCount, GL_UNSIGNED_INT, 0);
+            // Setup matrices for each egg
+            Vector3 noColor = {0, 0, 0};
+            SetShaderValue(shader, colorLoc, (float*)&noColor, SHADER_UNIFORM_VEC3);
 
-        // Draw second egg (Shader Type 1)
-        glUniform1i(glGetUniformLocation(shaderProgram, "shaderType"), 1);
-        mat4 modelMatrix2;
-        glm_mat4_identity(modelMatrix2);
-        glm_translate(modelMatrix2, (vec3){-0.02f, -0.01f, 0.0f}); // Position second egg
-        glm_scale(modelMatrix2, (vec3){modelScale, modelScale, modelScale});
-        glUniformMatrix4fv(glGetUniformLocation(shaderProgram, "model"), 1, GL_FALSE, (float*)modelMatrix2);
-        glUniform3fv(glGetUniformLocation(shaderProgram, "color"), 1, noColor);
-        glBindVertexArray(eggModel.vao);
-        glDrawElements(GL_TRIANGLES, eggModel.indexCount, GL_UNSIGNED_INT, 0);
+            // First egg
+            {
+                SetShaderValue(shader, shaderTypeLoc, (int[]){0}, SHADER_UNIFORM_INT);
+                Vector3 position = {0.02f, -0.01f, 0.0f};
+                
+                Matrix model = MatrixMultiply(
+                    MatrixTranslate(position.x, position.y, position.z),
+                    MatrixScale(modelScale, modelScale, modelScale)
+                );
+                
+                Matrix view = GetCameraMatrix(camera);
+                Matrix projection = MatrixPerspective(
+                    camera.fovy * DEG2RAD,
+                    (float)screenWidth/(float)screenHeight,
+                    0.01f, 1000.0f
+                );
+                
+                Matrix mvp = MatrixMultiply(MatrixMultiply(model, view), projection);
+                Matrix normalMatrix = MatrixTranspose(MatrixInvert(model));
+                
+                SetShaderValueMatrix(shader, modelLoc, model);
+                SetShaderValueMatrix(shader, mvpLoc, mvp);
+                SetShaderValueMatrix(shader, normalMatrixLoc, normalMatrix);
+                
+                DrawModel(eggModel, position, 1.0f, WHITE);
+            
+                
+            }
 
-        glfwSwapBuffers(window);
-        glfwPollEvents();
+            // Second egg
+            {
+                SetShaderValue(shader, shaderTypeLoc, (int[]){1}, SHADER_UNIFORM_INT);
+                Vector3 position = {-0.02f, -0.01f, 0.0f};
+                
+                Matrix model = MatrixMultiply(
+                    MatrixTranslate(position.x, position.y, position.z),
+                    MatrixScale(modelScale, modelScale, modelScale)
+                );
+                
+                Matrix view = GetCameraMatrix(camera);
+                Matrix projection = MatrixPerspective(
+                    camera.fovy * DEG2RAD,
+                    (float)screenWidth/(float)screenHeight,
+                    0.01f, 1000.0f
+                );
+                
+                Matrix mvp = MatrixMultiply(MatrixMultiply(model, view), projection);
+                Matrix normalMatrix = MatrixTranspose(MatrixInvert(model));
+                
+                SetShaderValueMatrix(shader, modelLoc, model);
+                SetShaderValueMatrix(shader, mvpLoc, mvp);
+                SetShaderValueMatrix(shader, normalMatrixLoc, normalMatrix);
+                
+                DrawModel(eggModel, position, 1.0f, WHITE);
+                    
+            }
+
+
+            EndMode3D();
+            
+            DrawText("Hold left mouse button and drag to rotate camera", 10, 10, 20, WHITE);
+            
+        EndDrawing();
     }
 
-    // Cleanup
-    glDeleteVertexArrays(1, &groundVAO);
-    glDeleteBuffers(1, &groundVBO);
-    glDeleteBuffers(1, &groundEBO);
-    glDeleteProgram(shaderProgram);
+    UnloadModel(eggModel);
+    UnloadShader(shader);
+    CloseWindow();
 
-    glfwTerminate();
     return 0;
 }

@@ -1,8 +1,8 @@
 CC=gcc
-CFLAGS=-Wall -I./include -I./extern/cgltf
-LIBS=-lglfw -lGL -lGLEW -lcglm -lm  # Added -lm for the math library
+CFLAGS=-Wall -I/opt/raylib/include
+LIBS=-lraylib -lGL -lm -lpthread -ldl -lrt -lX11
 
-SOURCES=src/main.c src/shader_loader.c src/model_loader.c
+SOURCES=src/main.c
 OBJECTS=$(SOURCES:.c=.o)
 EXECUTABLE=alien_egg
 
