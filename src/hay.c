@@ -150,10 +150,6 @@ HayPiece* InitializeNest(void) {
             255
         };
 
-        // Debug output
-        printf("HayPiece %d: startPos = (%.3f, %.3f, %.3f), originalHeight = (%.3f, %.3f, %.3f)\n",
-               i, hayPieces[i].startPos.x, hayPieces[i].startPos.y, hayPieces[i].startPos.z,
-               hayPieces[i].originalHeight.x, hayPieces[i].originalHeight.y, hayPieces[i].originalHeight.z);
     }
 
     // Top layer
@@ -193,10 +189,6 @@ HayPiece* InitializeNest(void) {
             255
         };
 
-        // Debug output
-        printf("HayPiece %d: startPos = (%.3f, %.3f, %.3f), originalHeight = (%.3f, %.3f, %.3f)\n",
-               idx, hayPieces[idx].startPos.x, hayPieces[idx].startPos.y, hayPieces[idx].startPos.z,
-               hayPieces[idx].originalHeight.x, hayPieces[idx].originalHeight.y, hayPieces[idx].originalHeight.z);
     }
 
     return hayPieces;

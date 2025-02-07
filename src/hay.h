@@ -6,7 +6,7 @@
 #include "constants.h"
 
 #define NUM_HAY_PIECES 1000
-#define NEST_RADIUS 0.2f
+#define NEST_RADIUS 0.4f
 #define NEST_HEIGHT 0.2f
 #define TOP_LAYER_PIECES 300
 #define HAY_STIFFNESS 5.0f     

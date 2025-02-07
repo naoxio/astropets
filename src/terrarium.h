@@ -3,7 +3,7 @@
 
 #include <raylib.h>
 #include <raymath.h>
-
+#include "light.h"
 typedef struct {
     Model sphere;
     float radius;
@@ -12,12 +12,18 @@ typedef struct {
 } GlassSphere;
 
 typedef struct {
+    Model surface;
+    float height;  
+    Shader shader;
+} Ground;
+
+typedef struct {
     GlassSphere glass;
-    // We can add more terrarium-related components here later
-    // Like ground, atmosphere effects, etc.
+    Ground ground;
+    LightComponent internalLight;
 } TerrariumSystem;
 
-TerrariumSystem InitializeTerrariumSystem(Shader glassShader);
+TerrariumSystem InitializeTerrariumSystem(Shader glassShader, Shader groundShader);
 void DrawTerrariumSystem(TerrariumSystem* terrarium, Camera3D camera);
 void UnloadTerrariumSystem(TerrariumSystem* terrarium);
 

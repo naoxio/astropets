@@ -4,9 +4,6 @@
 #include "egg.h"
 #include "hay.h"
 
-#define NUM_COLORS 9
-#define MODEL_SCALE 5.0f
-
 EggSystem InitializeEggSystem(Shader shader) {
     EggSystem eggSystem = { 0 };
     eggSystem.model = LoadModel("assets/egg.glb");
