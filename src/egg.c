@@ -18,17 +18,15 @@ EggSystem InitializeEggSystem(Shader shader) {
 
     return eggSystem;
 }
-
-void SpawnEgg(EggSystem* eggSystem) {
+void SpawnEgg(EggSystem* eggSystem, int colorType) {
     eggSystem->egg = (PhysicsObject){
         .position = (Vector3){ 0.0f, 2.0f, 0.0f },
         .velocity = (Vector3){ 0.0f, 0.0f, 0.0f },
         .isGrounded = false,
-        .colorType = GetRandomValue(0, eggSystem->numColors - 1),
+        .colorType = colorType, // Use the provided colorType instead of random
         .active = true
     };
 }
-
 void UpdateEggPhysics(EggSystem* eggSystem, HayPiece* hayPieces, float deltaTime) {
     if (!eggSystem->egg.active) return;
 

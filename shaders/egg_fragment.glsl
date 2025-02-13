@@ -53,22 +53,19 @@ float fbm(vec3 p) {
     }
     return value;
 }
-
-
-// Color palette function
 vec3 getBaseColor(int colorType, float variation) {
     // Base colors with variation
     switch(colorType) {
-        case 0: // Purple shades
+        case 0: // Red shades
             return mix(
-                vec3(0.5, 0.0, 0.8),
-                vec3(0.7, 0.2, 1.0),
+                vec3(0.9, 0.1, 0.1),
+                vec3(1.0, 0.3, 0.3),
                 variation
             );
-        case 1: // Pink shades
+        case 1: // Green shades
             return mix(
-                vec3(0.9, 0.2, 0.6),
-                vec3(1.0, 0.4, 0.8),
+                vec3(0.2, 0.8, 0.2),
+                vec3(0.4, 0.9, 0.4),
                 variation
             );
         case 2: // Blue shades
@@ -77,28 +74,28 @@ vec3 getBaseColor(int colorType, float variation) {
                 vec3(0.3, 0.6, 1.0),
                 variation
             );
-        case 3: // Orange shades
+        case 3: // Purple shades
+            return mix(
+                vec3(0.5, 0.0, 0.8),
+                vec3(0.7, 0.2, 1.0),
+                variation
+            );
+        case 4: // Pink shades
+            return mix(
+                vec3(0.9, 0.2, 0.6),
+                vec3(1.0, 0.4, 0.8),
+                variation
+            );
+        case 5: // Orange shades
             return mix(
                 vec3(0.9, 0.4, 0.1),
                 vec3(1.0, 0.6, 0.2),
                 variation
             );
-        case 4: // Green shades
-            return mix(
-                vec3(0.2, 0.8, 0.2),
-                vec3(0.4, 0.9, 0.4),
-                variation
-            );
-        case 5: // Cyan shades
+        case 6: // Cyan shades
             return mix(
                 vec3(0.0, 0.8, 0.8),
                 vec3(0.2, 0.9, 0.9),
-                variation
-            );
-        case 6: // Turquoise shades
-            return mix(
-                vec3(0.0, 0.6, 0.6),
-                vec3(0.2, 0.8, 0.7),
                 variation
             );
         case 7: // Yellow shades
@@ -113,24 +110,24 @@ vec3 getBaseColor(int colorType, float variation) {
                 vec3(0.7, 0.4, 0.2),
                 variation
             );
-        default: // Default purple
-            return vec3(0.5, 0.0, 0.8);
+        default: // Default red
+            return vec3(0.9, 0.1, 0.1);
     }
 }
 
 vec3 getAccentColor(int colorType, float variation) {
     // Accent colors that complement the base colors
     switch(colorType) {
-        case 0: // Purple accents
+        case 0: // Red accents
             return mix(
-                vec3(0.8, 0.2, 1.0),
-                vec3(1.0, 0.4, 1.0),
+                vec3(1.0, 0.2, 0.2),
+                vec3(1.0, 0.4, 0.4),
                 variation
             );
-        case 1: // Pink accents
+        case 1: // Green accents
             return mix(
-                vec3(1.0, 0.3, 0.7),
-                vec3(1.0, 0.5, 0.9),
+                vec3(0.3, 1.0, 0.3),
+                vec3(0.5, 1.0, 0.5),
                 variation
             );
         case 2: // Blue accents
@@ -139,28 +136,28 @@ vec3 getAccentColor(int colorType, float variation) {
                 vec3(0.4, 0.8, 1.0),
                 variation
             );
-        case 3: // Orange accents
+        case 3: // Purple accents
+            return mix(
+                vec3(0.8, 0.2, 1.0),
+                vec3(1.0, 0.4, 1.0),
+                variation
+            );
+        case 4: // Pink accents
+            return mix(
+                vec3(1.0, 0.3, 0.7),
+                vec3(1.0, 0.5, 0.9),
+                variation
+            );
+        case 5: // Orange accents
             return mix(
                 vec3(1.0, 0.5, 0.0),
                 vec3(1.0, 0.7, 0.2),
                 variation
             );
-        case 4: // Green accents
-            return mix(
-                vec3(0.3, 1.0, 0.3),
-                vec3(0.5, 1.0, 0.5),
-                variation
-            );
-        case 5: // Cyan accents
+        case 6: // Cyan accents
             return mix(
                 vec3(0.0, 1.0, 1.0),
                 vec3(0.3, 1.0, 1.0),
-                variation
-            );
-        case 6: // Turquoise accents
-            return mix(
-                vec3(0.0, 0.8, 0.7),
-                vec3(0.2, 1.0, 0.9),
                 variation
             );
         case 7: // Yellow accents
@@ -175,8 +172,8 @@ vec3 getAccentColor(int colorType, float variation) {
                 vec3(0.9, 0.5, 0.2),
                 variation
             );
-        default: // Default purple accent
-            return vec3(0.8, 0.2, 1.0);
+        default: // Default red accent
+            return vec3(1.0, 0.2, 0.2);
     }
 }
 

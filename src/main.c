@@ -9,142 +9,183 @@
 #include "constants.h"
 #include "terrarium.h"
 
+typedef enum {
+    SCREEN_WELCOME,
+    SCREEN_TERRARIUM
+} GameScreen;
+
+typedef struct {
+    Rectangle bounds;
+    Color color;
+    int colorType;
+} EggButton;
+
 int main(void) {
-   const int screenWidth = 800;
-   const int screenHeight = 600;
+    const int screenWidth = 800;
+    const int screenHeight = 600;
 
-   // Initialize window
-   InitWindow(screenWidth, screenHeight, "Space Terrarium");
-   SetTargetFPS(60);
+    // Initialize window
+    InitWindow(screenWidth, screenHeight, "Space Terrarium");
+    SetTargetFPS(60);
 
-   // Load shaders
-   Shader eggShader = LoadShader("shaders/egg_vertex.glsl", "shaders/egg_fragment.glsl");
-   Shader glassShader = LoadShader("shaders/glass_vertex.glsl", "shaders/glass_fragment.glsl");
-   Shader groundShader = LoadShader("shaders/ground_vertex.glsl", "shaders/ground_fragment.glsl");
-   Shader spaceShader = LoadShader("shaders/space_vertex.glsl", "shaders/space_background.fs");
+    GameScreen currentScreen = SCREEN_WELCOME;
 
-   // Create skybox
-   Mesh skyMesh = GenMeshSphere(1000.0f, 64, 64);
-   Model skybox = LoadModelFromMesh(skyMesh);
-   skybox.materials[0].shader = spaceShader;
+    // Create egg selection buttons
+    EggButton eggButtons[3] = {
+        {(Rectangle){screenWidth/2 - 200, screenHeight/2, 100, 120}, RED, 0},
+        {(Rectangle){screenWidth/2 - 50, screenHeight/2, 100, 120}, GREEN, 1},
+        {(Rectangle){screenWidth/2 + 100, screenHeight/2, 100, 120}, BLUE, 2}
+    };
 
-   // Create a center point that everything will reference
-   Vector3 centerPoint = (Vector3){ 0.0f, 0.0f, 0.0f };
+    // Load shaders
+    Shader eggShader = LoadShader("shaders/egg_vertex.glsl", "shaders/egg_fragment.glsl");
+    Shader glassShader = LoadShader("shaders/glass_vertex.glsl", "shaders/glass_fragment.glsl");
+    Shader groundShader = LoadShader("shaders/ground_vertex.glsl", "shaders/ground_fragment.glsl");
+    Shader spaceShader = LoadShader("shaders/space_vertex.glsl", "shaders/space_background.fs");
 
-   // Initialize systems
-   HayPiece* hayPieces = InitializeNest();
-   EggSystem eggSystem = InitializeEggSystem(eggShader);
-   TerrariumSystem terrarium = InitializeTerrariumSystem(glassShader, groundShader);
+    // Create skybox
+    Mesh skyMesh = GenMeshSphere(1000.0f, 64, 64);
+    Model skybox = LoadModelFromMesh(skyMesh);
+    skybox.materials[0].shader = spaceShader;
 
-   // Camera setup centered on centerPoint
-   Camera3D camera = {
-       .position = (Vector3){ centerPoint.x, centerPoint.y + 2.0f, centerPoint.z + 4.0f },
-       .target = centerPoint,
-       .up = (Vector3){ 0.0f, 1.0f, 0.0f },
-       .fovy = 40.0f,
-       .projection = CAMERA_PERSPECTIVE,
-   };
+    // Create a center point that everything will reference
+    Vector3 centerPoint = (Vector3){ 0.0f, 0.0f, 0.0f };
 
-   // Orbital camera parameters
-   float cameraDistance = 4.0f;
-   const float minDistance = 3.0f;
-   const float maxDistance = 10.0f;
-   const float zoomSpeed = 0.5f;
-   float angleHorizontal = 0.0f;
-   float angleVertical = 0.3f;
-   float rotationSpeed = 2.0f;
+    // Initialize systems
+    HayPiece* hayPieces = InitializeNest();
+    EggSystem eggSystem = InitializeEggSystem(eggShader);
+    TerrariumSystem terrarium = InitializeTerrariumSystem(glassShader, groundShader);
 
-   DisableCursor();
+    // Camera setup centered on centerPoint
+    Camera3D camera = {
+        .position = (Vector3){ centerPoint.x, centerPoint.y + 2.0f, centerPoint.z + 4.0f },
+        .target = centerPoint,
+        .up = (Vector3){ 0.0f, 1.0f, 0.0f },
+        .fovy = 40.0f,
+        .projection = CAMERA_PERSPECTIVE,
+    };
 
-   while (!WindowShouldClose()) {
-       float deltaTime = GetFrameTime();
+    // Orbital camera parameters
+    float cameraDistance = 4.0f;
+    const float minDistance = 3.0f;
+    const float maxDistance = 10.0f;
+    const float zoomSpeed = 0.5f;
+    float angleHorizontal = 0.0f;
+    float angleVertical = 0.3f;
+    float rotationSpeed = 2.0f;
 
-       // Handle zoom with mouse wheel
-       float wheel = GetMouseWheelMove();
-       if (wheel != 0) {
-           cameraDistance -= wheel * zoomSpeed;
-           cameraDistance = Clamp(cameraDistance, minDistance, maxDistance);
-       }
+    while (!WindowShouldClose()) {
+        float deltaTime = GetFrameTime();
 
-       // Spawn new egg on spacebar
-       if (IsKeyPressed(KEY_SPACE)) {
-           SpawnEgg(&eggSystem);
-       }
+        if (currentScreen == SCREEN_WELCOME) {
+            // Welcome screen logic
+            Vector2 mousePoint = GetMousePosition();
+            
+            for (int i = 0; i < 3; i++) {
+                if (CheckCollisionPointRec(mousePoint, eggButtons[i].bounds) && 
+                    IsMouseButtonPressed(MOUSE_BUTTON_LEFT)) {
+                    currentScreen = SCREEN_TERRARIUM;
+                    eggSystem.egg.colorType = eggButtons[i].colorType;
+                    SpawnEgg(&eggSystem, eggButtons[i].colorType);
+                    DisableCursor();
+                    break;
+                }
+            }
 
-       if (IsKeyPressed(KEY_L)) {  // Press L to increase light intensity
-           terrarium.internalLight.intensity += 2.0f;
-       }
-       if (IsKeyPressed(KEY_K)) {  // Press K to decrease light intensity
-           terrarium.internalLight.intensity -= 2.0f;
-           terrarium.internalLight.intensity = fmax(0.0f, terrarium.internalLight.intensity);
-       }
+            BeginDrawing();
+                ClearBackground(BLACK);
+                DrawText("Welcome to Astropet", screenWidth/2 - MeasureText("Welcome to Astropet", 40)/2, 
+                        screenHeight/4, 40, WHITE);
+                DrawText("Select an egg to get started", screenWidth/2 - 
+                        MeasureText("Select an egg to get started", 20)/2, screenHeight/3, 20, WHITE);
+                
+                // Draw egg buttons
+                for (int i = 0; i < 3; i++) {
+                    DrawRectangleRec(eggButtons[i].bounds, eggButtons[i].color);
+                    DrawRectangleLinesEx(eggButtons[i].bounds, 2, WHITE);
+                }
+            EndDrawing();
+            
+        } else {
+            // Terrarium screen logic
+            // [Previous terrarium logic remains the same]
+            float wheel = GetMouseWheelMove();
+            if (wheel != 0) {
+                cameraDistance -= wheel * zoomSpeed;
+                cameraDistance = Clamp(cameraDistance, minDistance, maxDistance);
+            }
 
-       // Update physics
-       UpdateEggPhysics(&eggSystem, hayPieces, deltaTime);
+    
+            if (IsKeyPressed(KEY_L)) {
+                terrarium.internalLight.intensity += 2.0f;
+            }
+            if (IsKeyPressed(KEY_K)) {
+                terrarium.internalLight.intensity -= 2.0f;
+                terrarium.internalLight.intensity = fmax(0.0f, terrarium.internalLight.intensity);
+            }
 
-       // Camera movement
-       if (IsMouseButtonDown(MOUSE_BUTTON_LEFT)) {
-           Vector2 mouseDelta = GetMouseDelta();
-           angleHorizontal -= mouseDelta.x * rotationSpeed * deltaTime;
-           angleVertical -= mouseDelta.y * rotationSpeed * deltaTime;
-           angleVertical = Clamp(angleVertical, -1.5f, 1.5f);
-       }
+            UpdateEggPhysics(&eggSystem, hayPieces, deltaTime);
 
-       // Update camera position relative to center
-       float x = centerPoint.x + cameraDistance * cosf(angleVertical) * sinf(angleHorizontal);
-       float y = centerPoint.y + cameraDistance * sinf(angleVertical);
-       float z = centerPoint.z + cameraDistance * cosf(angleVertical) * cosf(angleHorizontal);
-       camera.position = (Vector3){ x, y + 0.05f, z };
-       camera.target = centerPoint;
+            if (IsMouseButtonDown(MOUSE_BUTTON_LEFT)) {
+                Vector2 mouseDelta = GetMouseDelta();
+                angleHorizontal -= mouseDelta.x * rotationSpeed * deltaTime;
+                angleVertical -= mouseDelta.y * rotationSpeed * deltaTime;
+                angleVertical = Clamp(angleVertical, -1.5f, 1.5f);
+            }
 
-       BeginDrawing();
-           ClearBackground(BLACK);
+            float x = centerPoint.x + cameraDistance * cosf(angleVertical) * sinf(angleHorizontal);
+            float y = centerPoint.y + cameraDistance * sinf(angleVertical);
+            float z = centerPoint.z + cameraDistance * cosf(angleVertical) * cosf(angleHorizontal);
+            camera.position = (Vector3){ x, y + 0.05f, z };
+            camera.target = centerPoint;
 
-           BeginMode3D(camera);
-               // Draw skybox first
-               rlDisableBackfaceCulling();
-               rlDisableDepthMask();
-               rlDisableDepthTest(); 
+            BeginDrawing();
+                ClearBackground(BLACK);
 
-               // Update shader uniforms
-               float timeValue = GetTime();
-               SetShaderValue(spaceShader, GetShaderLocation(spaceShader, "time"), &timeValue, SHADER_UNIFORM_FLOAT);
-               
-               // Draw skybox centered
-               DrawModel(skybox, centerPoint, 1.0f, WHITE);
-               
-               rlEnableDepthTest();
-               rlEnableBackfaceCulling();
-               rlEnableDepthMask();
+                BeginMode3D(camera);
+                    // [Previous drawing code remains the same]
+                    rlDisableBackfaceCulling();
+                    rlDisableDepthMask();
+                    rlDisableDepthTest(); 
 
-               // Draw contents (hay and eggs) relative to center
-               for (int i = 0; i < NUM_HAY_PIECES + TOP_LAYER_PIECES; i++) {
-                   if (Vector3Distance(hayPieces[i].startPos, centerPoint) < terrarium.glass.radius) {
-                       DrawHayPiece(hayPieces[i]);
-                   }
-               }
+                    float timeValue = GetTime();
+                    SetShaderValue(spaceShader, GetShaderLocation(spaceShader, "time"), 
+                                 &timeValue, SHADER_UNIFORM_FLOAT);
+                    
+                    DrawModel(skybox, centerPoint, 1.0f, WHITE);
+                    
+                    rlEnableDepthTest();
+                    rlEnableBackfaceCulling();
+                    rlEnableDepthMask();
 
-               DrawEgg(&eggSystem, camera, eggShader);
-               DrawTerrariumSystem(&terrarium, camera);
-           EndMode3D();
+                    for (int i = 0; i < NUM_HAY_PIECES + TOP_LAYER_PIECES; i++) {
+                        if (Vector3Distance(hayPieces[i].startPos, centerPoint) < terrarium.glass.radius) {
+                            DrawHayPiece(hayPieces[i]);
+                        }
+                    }
 
-           DrawText("Hold left mouse button and drag to rotate camera", 10, 10, 20, WHITE);
-           DrawText("Use mouse wheel to zoom in/out", 10, 30, 20, WHITE);
-           DrawText("Press SPACE to spawn egg", 10, 50, 20, WHITE);
-           DrawText("Press L/K to increase/decrease light", 10, 70, 20, WHITE);
-       EndDrawing();
-   }
+                    DrawEgg(&eggSystem, camera, eggShader);
+                    DrawTerrariumSystem(&terrarium, camera);
+                EndMode3D();
 
-   // Cleanup
-   UnloadModel(skybox);
-   free(hayPieces);
-   UnloadEggSystem(&eggSystem);
-   UnloadShader(eggShader);
-   UnloadShader(glassShader);
-   UnloadShader(groundShader);
-   UnloadShader(spaceShader);
-   UnloadTerrariumSystem(&terrarium);
-   CloseWindow();
+                DrawText("Hold left mouse button and drag to rotate camera", 10, 10, 20, WHITE);
+                DrawText("Use mouse wheel to zoom in/out", 10, 30, 20, WHITE);
+                DrawText("Press SPACE to spawn egg", 10, 50, 20, WHITE);
+                DrawText("Press L/K to increase/decrease light", 10, 70, 20, WHITE);
+            EndDrawing();
+        }
+    }
 
-   return 0;
+    // Cleanup
+    UnloadModel(skybox);
+    free(hayPieces);
+    UnloadEggSystem(&eggSystem);
+    UnloadShader(eggShader);
+    UnloadShader(glassShader);
+    UnloadShader(groundShader);
+    UnloadShader(spaceShader);
+    UnloadTerrariumSystem(&terrarium);
+    CloseWindow();
+
+    return 0;
 }
